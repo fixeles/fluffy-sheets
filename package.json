@@ -1,0 +1,19 @@
+{
+  "name": "com.fps.sheets",
+  "author": "Fixeles",
+  "displayName": "Fluffy Sheets",
+  "unity": "2022.3",
+  "version": "0.0.1",
+  "keywords": [
+    "Fluffy Pixels",
+    "fps",
+    "Google Sheets api"
+  ],
+  "dependencies": {
+    "com.fps.utils": "0.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fixeles/fluffy-sheets"
+  }
+}
