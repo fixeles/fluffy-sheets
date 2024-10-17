@@ -11,32 +11,68 @@ namespace FPS.Sheets
 {
 	public class SheetsApi
 	{
-		private readonly DtoStorage _dtoStorage;
+		private readonly DTOStorage _dtoStorage;
 		private const string ApiURL = "https://sheets.googleapis.com/v4/spreadsheets/{0}/values/{1}?key={2}";
+
+		/// <summary>
+		/// First list with compressed data
+		/// </summary>
 		private const string CsvURL = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv";
 
-		public SheetsApi(DtoStorage dtoStorage)
+		private static SheetsConfig _sheetsConfig;
+
+		private static SheetsConfig SheetsConfig
+		{
+			get
+			{
+				if (_sheetsConfig == null)
+				{
+					var asset = Resources.Load<SheetsConfig>(nameof(SheetsConfig));
+					_sheetsConfig = asset;
+					Resources.UnloadAsset(asset);
+				}
+
+				return _sheetsConfig;
+			}
+		}
+
+		public SheetsApi(DTOStorage dtoStorage)
 		{
 			_dtoStorage = dtoStorage;
 		}
 
-		public static string SheetInfoURL
-		{
-			get
-			{
-				var config = Resources.Load<SheetsConfig>(nameof(SheetsConfig));
-				var result = $"https://sheets.googleapis.com/v4/spreadsheets/{config.SheetID}?key={config.APIKey}";
-				Resources.UnloadAsset(config);
-				return result;
-			}
-		}
+		public static string SheetInfoURL =>
+			$"https://sheets.googleapis.com/v4/spreadsheets/{SheetsConfig.SheetID}?key={SheetsConfig.APIKey}";
 
 		public static string GetListURL(string listName)
 		{
-			var config = Resources.Load<SheetsConfig>(nameof(SheetsConfig));
-			var result = string.Format(ApiURL, config.SheetID, listName, config.APIKey);
-			Resources.UnloadAsset(config);
-			return result;
+			return string.Format(ApiURL, SheetsConfig.SheetID, listName, SheetsConfig.APIKey);
+		}
+
+		public static void ParseValue<T>(object rawValue, out T target)
+		{
+			target = default;
+
+			if (rawValue == null)
+				return;
+
+			if (rawValue is string str && str.Trim().StartsWith("{") && str.Trim().EndsWith("}"))
+			{
+				target = JsonConvert.DeserializeObject<T>(str);
+				return;
+			}
+
+			target = target switch
+			{
+				string => (T)(object)rawValue.ToString(),
+				_ => (T)Convert.ChangeType(rawValue, typeof(T))
+			};
+		}
+
+		public async UniTask<string> LoadCompressedData()
+		{
+			var req = await UnityWebRequest.Get(CsvURL).SendWebRequest();
+			return req.downloadHandler.text;
 		}
 
 		public async UniTask<string> GetListData(string listName)
@@ -61,26 +97,6 @@ namespace FPS.Sheets
 				var dto = (T)constructor!.Invoke(new object[] { dict });
 				_dtoStorage.Add(dto);
 			}
-		}
-
-		public static void GetValue<T>(object rawValue, out T target)
-		{
-			target = default;
-
-			if (rawValue == null)
-				return;
-
-			if (rawValue is string str && str.Trim().StartsWith("{") && str.Trim().EndsWith("}"))
-			{
-				target = JsonConvert.DeserializeObject<T>(str);
-				return;
-			}
-
-			target = target switch
-			{
-				string => (T)(object)rawValue.ToString(),
-				_ => (T)Convert.ChangeType(rawValue, typeof(T))
-			};
 		}
 	}
 }

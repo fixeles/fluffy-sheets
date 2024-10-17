@@ -9,10 +9,15 @@ using UnityEngine.Networking;
 
 namespace FPS.Sheets.Editor
 {
-	public static class GenerateCompressedConfig
+	public static class CompressedConfig
 	{
 		[MenuItem("FPS/Generate Compressed Config")]
-		public static async void Generate()
+		private static void Generate()
+		{
+			GenerateAsync(true).Forget();
+		}
+
+		public static async UniTask GenerateAsync(bool copyToBuffer = false)
 		{
 			var startTime = Time.time;
 
@@ -42,13 +47,14 @@ namespace FPS.Sheets.Editor
 			}
 
 			string rawJson = JsonConvert.SerializeObject(sheetJsons);
-			var compressedJson = GZip.Compress(rawJson);
+			var encodedJson = GZip.Encode(rawJson);
 
-			EditorGUIUtility.systemCopyBuffer = compressedJson;
+			if (copyToBuffer) 
+				EditorGUIUtility.systemCopyBuffer = encodedJson;
 
 			string resourcesPath = Application.dataPath + "/FPS/Resources";
 			string filePath = Path.Combine(resourcesPath, "CachedSheetsData.txt");
-			await File.WriteAllTextAsync(filePath, compressedJson);
+			await File.WriteAllTextAsync(filePath, encodedJson);
 			Debug.Log($"Data received in {Time.time - startTime:0.0} " +
 			          $"sec. Use Ctrl + V \nDefault config file was created: {filePath}");
 		}

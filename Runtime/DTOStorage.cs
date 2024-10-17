@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace FPS.Sheets
 {
-	public class DtoStorage
+	public class DTOStorage
 	{
 		private readonly Dictionary<Type, object> _dtoByType = new();
 
@@ -22,7 +22,7 @@ namespace FPS.Sheets
 
 		public void Add<T>(T obj) where T : ISheetDTO => GetGenericStorage<T>().Add(obj);
 
-		public T GetDTO<T>(string key) where T : ISheetDTO => GetGenericStorage<T>().GetDTO(key);
+		public T Get<T>(string key) where T : ISheetDTO => GetGenericStorage<T>().GetDTO(key);
 
 		public T[] GetAll<T>() where T : ISheetDTO => GetGenericStorage<T>().GetAll();
 
