@@ -9,13 +9,12 @@ namespace FPS.Sheets
 		[field: SerializeField] public string SheetID { get; private set; }
 
 #if UNITY_EDITOR
-		[field: SerializeField] public SheetLoadType ReceiveType { get; private set; }
+		[field: SerializeField] public SheetLoadType LoadType { get; private set; }
 
 		public enum SheetLoadType
 		{
-			Compressed,
-			EachList,
-			CachedOnly
+			Encoded,
+			EachSheet
 		}
 
 		private class Creator : ScriptableObjectCreator<SheetsConfig>

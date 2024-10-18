@@ -1,24 +1,13 @@
-using System;
-using System.Collections;
-using System.Linq;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
 namespace FPS.Sheets
 {
-	public class SheetsApi
+	public static class SheetsApi
 	{
-		private readonly DTOStorage _dtoStorage;
-		private const string ApiURL = "https://sheets.googleapis.com/v4/spreadsheets/{0}/values/{1}?key={2}";
-
-		/// <summary>
-		/// First list with compressed data
-		/// </summary>
-		private const string CsvURL = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv";
-
 		private static SheetsConfig _sheetsConfig;
 
 		private static SheetsConfig SheetsConfig
@@ -36,66 +25,59 @@ namespace FPS.Sheets
 			}
 		}
 
-		public SheetsApi(DTOStorage dtoStorage)
-		{
-			_dtoStorage = dtoStorage;
-		}
+		/// <summary>
+		/// First list with compressed data
+		/// </summary>
+		private static string CsvURL =>
+			$"https://docs.google.com/spreadsheets/d/{SheetsConfig.SheetID}/export?format=csv";
 
-		public static string SheetInfoURL =>
+		private static string SheetInfoURL =>
 			$"https://sheets.googleapis.com/v4/spreadsheets/{SheetsConfig.SheetID}?key={SheetsConfig.APIKey}";
 
-		public static string GetListURL(string listName)
-		{
-			return string.Format(ApiURL, SheetsConfig.SheetID, listName, SheetsConfig.APIKey);
-		}
+		private static string GetListURL(string listName) =>
+			$"https://sheets.googleapis.com/v4/spreadsheets/{SheetsConfig.SheetID}/values/{listName}?key={SheetsConfig.APIKey}";
 
-		public static void ParseValue<T>(object rawValue, out T target)
-		{
-			target = default;
 
-			if (rawValue == null)
-				return;
-
-			if (rawValue is string str && str.Trim().StartsWith("{") && str.Trim().EndsWith("}"))
-			{
-				target = JsonConvert.DeserializeObject<T>(str);
-				return;
-			}
-
-			target = target switch
-			{
-				string => (T)(object)rawValue.ToString(),
-				_ => (T)Convert.ChangeType(rawValue, typeof(T))
-			};
-		}
-
-		public async UniTask<string> LoadCompressedData()
+		public static async UniTask<string> LoadEncodedData()
 		{
 			var req = await UnityWebRequest.Get(CsvURL).SendWebRequest();
 			return req.downloadHandler.text;
 		}
 
-		public async UniTask<string> GetListData(string listName)
+		public static async UniTask LoadEachDTO(Dictionary<string, string> result)
 		{
-			var req = await UnityWebRequest.Get(GetListURL(listName)).SendWebRequest();
-			return req.downloadHandler.text;
+			foreach (var dtoType in Utils.Reflection.FindAllDerivedTypes(typeof(ISheetDTO)))
+			{
+				var request = UnityWebRequest.Get(GetListURL(dtoType.Name));
+				await request.SendWebRequest();
+				result.Add(dtoType.Name, request.downloadHandler.text);
+			}
 		}
 
-		public void Parse<T>(string sheetJson) where T : ISheetDTO
+		public static async UniTask LoadEachSheet(Dictionary<string, string> result)
 		{
-			var raws = JsonConvert.DeserializeObject<JObject>(sheetJson)["values"] as JArray;
-			var headers = JsonConvert.DeserializeObject<string[]>(raws![0].ToString());
-			var dict = headers.ToDictionary(key => key.ToString(), null);
+			Dictionary<string, string> sheetGIDs = new();
 
-			for (int raw = 0; raw < raws.Count - 1; raw++)
+			UnityWebRequest request = UnityWebRequest.Get(SheetInfoURL);
+			await request.SendWebRequest();
+
+			var data = JObject.Parse(request.downloadHandler.text);
+			foreach (var sheet in data["sheets"]!)
 			{
-				var valuesRaw = JsonConvert.DeserializeObject<string[]>(raws[raw + 1].ToString());
-				for (int column = 0; column < headers.Length; column++)
-					dict[headers[column]] = valuesRaw[column];
+				var properties = sheet["properties"];
+				var sheetName = properties!["title"]!.ToString();
 
-				var constructor = typeof(T).GetConstructor(new[] { typeof(IDictionary) });
-				var dto = (T)constructor!.Invoke(new object[] { dict });
-				_dtoStorage.Add(dto);
+				if (sheetName is "Encoded" or "Local")
+					continue;
+
+				sheetGIDs.Add(sheetName, properties!["sheetId"]!.ToString());
+			}
+
+			foreach (var kvp in sheetGIDs)
+			{
+				request = UnityWebRequest.Get(GetListURL(kvp.Key));
+				await request.SendWebRequest();
+				result.Add(kvp.Key, request.downloadHandler.text);
 			}
 		}
 	}
