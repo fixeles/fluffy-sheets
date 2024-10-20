@@ -25,18 +25,21 @@ namespace FPS.Sheets
 				dtoStorage.Add(dto);
 			}
 		}
-		
-		public static void GetValue<T>(object rawValue, out T target)
+
+		public static void GetValue<T>(object rawValue, out T target, params JsonConverter[] converters)
 		{
 			target = default;
 
 			if (rawValue == null)
 				return;
 
-			if (rawValue is string str && str.Trim().StartsWith("{") && str.Trim().EndsWith("}"))
+			if (rawValue is string str)
 			{
-				target = JsonConvert.DeserializeObject<T>(str);
-				return;
+				if (str[0] is '{' or '[' && str[^1] is '}' or ']')
+				{
+					target = JsonConvert.DeserializeObject<T>(str, converters);
+					return;
+				}
 			}
 
 			target = target switch
